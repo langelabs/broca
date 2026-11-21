@@ -1,0 +1,57 @@
+[project]
+name = "broca"
+version = "0.1.0"
+description = "Local AI inference and model management by Lange Labs."
+authors = [{ name = "hey@robertlange.me" }]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "certifi>=2026.10.18",
+    "fastapi>=0.163.1",
+    "filelock>=3.0.0",
+    "huggingface-hub>=2.4.0",
+    "idna>=3.15",
+    "pydantic>=2.0.0,<3.0.0",
+    "python-multipart>=0.0.32,<1",
+    "tqdm>=4.67.0",
+    "uvicorn>=0.54.0",
+]
+
+[project.optional-dependencies]
+ai = [
+    "accelerate>=1.12,<2",
+    "av>=16,<20",
+    "diffusers>=0.43,<0.44",
+    "ftfy>=6.3,<7",
+    "gguf>=0.19,<1",
+    "llama-cpp-python>=0.3.37,<0.4",
+    "pillow",
+    "protobuf>=5",
+    "safetensors>=0.8,<1",
+    "sentencepiece>=0.2,<1",
+    "sentence-transformers>=6.1,<7",
+    "torch>=2.10,<3",
+    "torchvision>=0.25,<1",
+    "transformers>=5.17,<6",
+]
+
+[tool.poetry]
+packages = [{ include = "broca" }]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.uv]
+environments = [
+    "sys_platform == 'darwin'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1,<0.29.0",
+    "pytest>=8.4.2,<9.0.0",
+    "ruff>=0.15.20",
+]
+benchmarks = ["openai"]

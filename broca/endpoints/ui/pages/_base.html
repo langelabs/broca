@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Model Test · Lange Labs AI</title>
+    <script
+        defer
+        src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.5"
+        integrity="sha384-7t++RelBZUKYuVklRj4VH35EUtPrDekGESbbngrE48HnxerJNvab7Fb1W+QhFvNa"
+        crossorigin="anonymous"
+    ></script>
+</head>
+<body class="min-h-screen bg-black p-4 text-white sm:p-8">
+<main class="mx-auto max-w-3xl space-y-6">
+    <a href="/" class="underline underline-offset-4">Dashboard</a>
+    <h1 id="test-title" class="text-3xl font-bold">Test model</h1>
+    <form id="model-test" class="grid gap-4">
+        <label class="grid gap-2" for="test-model">
+            Model
+            <select id="test-model" class="w-full border border-white bg-black p-2" required></select>
+        </label>
+        <label class="grid gap-2" for="test-input">
+            <span id="input-label">Prompt</span>
+            <textarea id="test-input" class="w-full border border-white p-3" rows="5" required></textarea>
+        </label>
+        <fieldset id="test-attachments" class="space-y-2" hidden>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <label class="grid min-w-0 gap-2" for="test-audio">
+                    Audio file (optional)
+                    <input id="test-audio" name="audio" type="file" accept=".wav,.mp3,audio/wav,audio/mpeg" aria-describedby="attachment-context" class="w-full border border-white p-2">
+                </label>
+                <label class="grid min-w-0 gap-2" for="test-image">
+                    Image file (optional)
+                    <input id="test-image" name="image" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" aria-describedby="attachment-context" class="w-full border border-white p-2">
+                </label>
+            </div>
+            <p id="attachment-context" class="text-sm text-white/70">Attach WAV or MP3 audio and PNG or JPEG images. Gemma receives the contents and file details.</p>
+        </fieldset>
+        <button id="run-test" type="submit" class="justify-self-start bg-white px-4 py-2 text-black disabled:opacity-50" disabled>Run test</button>
+    </form>
+    <p id="test-status" class="empty:hidden" role="status">Loading models…</p>
+    <div id="test-result"></div>
+</main>
+
+<script type="module">
+    const modality = window.location.pathname.split("/").filter(Boolean).at(-1);
+    const title = modality.charAt(0).toUpperCase() + modality.slice(1);
+    const form = document.querySelector("#model-test");
+    const models = document.querySelector("#test-model");
+    const input = document.querySelector("#test-input");
+    const attachments = document.querySelector("#test-attachments");
+    const button = document.querySelector("#run-test");
+    const status = document.querySelector("#test-status");
+    const output = document.querySelector("#test-result");
+    let mediaUrl = null;
+
+    document.title = `Test ${modality} · Lange Labs AI`;
+    document.querySelector("#test-title").textContent = `${title} test`;
+    attachments.hidden = modality !== "text";
+    if (modality === "decision") {
+        document.querySelector("#input-label").textContent = "Decision request (JSON)";
+        input.value = JSON.stringify({
+            state: { color: "green" },
+            decision: {
+                kind: "noul",
+                instructions: "Is the color green?",
+                yes_description: "The color is green.",
+                no_description: "The color is a different color.",
+            },
+        }, null, 2);
+        input.rows = 12;
+    } else if (modality === "audio" || modality === "embedding") {
+        document.querySelector("#input-label").textContent = "Text";
+    }
+
+    try {
+        const response = await fetch("/v1/models", { cache: "no-store" });
+        if (!response.ok) throw new Error("Could not fetch the model catalog.");
+        const { data } = await response.json();
+        const selected = new URLSearchParams(window.location.search).get("model");
+        for (const model of data.filter(item => item.modality === modality)) {
+            models.add(new Option(model.id, model.id, false, model.id === selected));
+        }
+        status.textContent = models.length ? "" : "No configured model for this modality.";
+        button.disabled = models.length === 0;
+    } catch (error) {
+        status.textContent = error.message;
+    }
+
+    form.addEventListener("submit", /** @param {SubmitEvent} event Model test submission. */ async event => {
+        event.preventDefault();
+        if (button.disabled) return;
+        button.disabled = true;
+        status.textContent = "Running…";
+        output.replaceChildren();
+        if (mediaUrl !== null) {
+            URL.revokeObjectURL(mediaUrl);
+            mediaUrl = null;
+        }
+        try {
+            let prompt = input.value;
+            const media = [];
+            if (modality === "text") {
+                const metadata = {};
+                for (const kind of ["image", "audio"]) {
+                    const picker = attachments.elements.namedItem(kind);
+                    const file = picker.files[0];
+                    if (!file) continue;
+                    const extension = file.name.split(".").at(-1).toLowerCase();
+                    const format = extension === "jpg" ? "jpeg" : extension;
+                    const allowedFormats = kind === "image" ? ["png", "jpeg"] : ["wav", "mp3"];
+                    if (!allowedFormats.includes(format)) {
+                        throw new Error(`Choose ${allowedFormats.join(" or ").toUpperCase()} for ${kind}.`);
+                    }
+                    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+                        throw new Error("Each attachment must contain data and be 10 MiB or smaller.");
+                    }
+                    const dataUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = () => reject(new Error(`Could not read the ${kind} file.`));
+                        reader.readAsDataURL(file);
+                    });
+                    media.push({
+                        type: kind === "audio" ? "input_audio" : "image",
+                        format,
+                        data: dataUrl.slice(dataUrl.indexOf(",") + 1),
+                    });
+                    metadata[kind] = {
+                        file_name: file.name,
+                        media_type: file.type || null,
+                        size_bytes: file.size,
+                        last_modified_ms: file.lastModified,
+                    };
+                }
+                if (Object.keys(metadata).length) {
+                    // Escape angle brackets so filenames cannot insert Gemma control tokens.
+                    const context = JSON.stringify(metadata).replaceAll("<", "\\u003c");
+                    prompt += `\n\nAttached file metadata (JSON):\n${context}`;
+                }
+            }
+            const isImage = modality === "image";
+            const response = await fetch(isImage ? "/v1/images/generations" : window.location.pathname, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(isImage
+                    ? { model: models.value, prompt, stream: true, partial_images: 2 }
+                    : { model: models.value, input: prompt, attachments: media }),
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(typeof error.detail === "string" ? error.detail : error.detail?.[0]?.msg || "Check the test input.");
+            }
+            if (isImage) {
+                const image = document.createElement("img");
+                image.className = "max-w-full";
+                let pending = "";
+                let completed = false;
+                for await (const chunk of response.body.pipeThrough(new TextDecoderStream())) {
+                    const frames = (pending + chunk).split(/\r?\n\r?\n/);
+                    pending = frames.pop();
+                    for (const frame of frames) {
+                        const data = frame.split(/\r?\n/)
+                            .filter(line => line.startsWith("data:"))
+                            .map(line => line.slice(5).trimStart()).join("\n");
+                        if (!data) continue;
+                        const event = JSON.parse(data);
+                        if (event.error) throw new Error(event.error.message);
+                        const preview = event.type === "image_generation.partial_image";
+                        const final = event.type === "image_generation.completed";
+                        if (!preview && !final) continue;
+                        image.alt = preview ? "Image preview" : "Generated image";
+                        image.src = `data:image/png;base64,${event.b64_json}`;
+                        if (!image.isConnected) output.append(image);
+                        if (preview) status.textContent = "Generating image…";
+                        if (final) completed = true;
+                    }
+                }
+                if (!completed) throw new Error("The image stream ended before generation completed.");
+            } else if (modality === "audio" || modality === "video") {
+                const element = document.createElement(modality);
+                mediaUrl = URL.createObjectURL(await response.blob());
+                element.src = mediaUrl;
+                element.className = "max-w-full";
+                element.controls = true;
+                output.append(element);
+            } else {
+                const result = await response.json();
+                const text = document.createElement("pre");
+                text.className = "overflow-x-auto whitespace-pre-wrap wrap-anywhere border border-white p-3";
+                text.textContent = modality === "text" ? result.text : JSON.stringify(result, null, 2);
+                output.append(text);
+            }
+            status.textContent = "";
+        } catch (error) {
+            status.textContent = error.message;
+        } finally {
+            button.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>

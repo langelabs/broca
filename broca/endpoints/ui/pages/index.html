@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Load tests · Lange Labs AI</title>
+    <script
+        defer
+        src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.5"
+        integrity="sha384-7t++RelBZUKYuVklRj4VH35EUtPrDekGESbbngrE48HnxerJNvab7Fb1W+QhFvNa"
+        crossorigin="anonymous"
+    ></script>
+</head>
+<body class="min-h-screen bg-black p-4 text-white sm:p-8">
+<main>
+    <a href="/" class="mb-6 inline-block underline underline-offset-4">Dashboard</a>
+    <h1 id="load-test-title" class="mb-2 text-3xl font-bold">Load tests</h1>
+    <p class="mb-4 text-sm text-white/70">Load the model for a modality, then run a single round or all 20 rounds. The round number is the number of concurrent requests.</p>
+    <p id="load-test-status" class="mb-2 min-h-5 text-sm" role="status">Loading models…</p>
+    <fieldset id="load-test-controls" class="min-w-0" aria-labelledby="load-test-title" disabled>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse whitespace-nowrap text-left" aria-labelledby="load-test-title">
+                <thead>
+                    <tr id="load-test-head">
+                        <td class="border border-white"></td>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr id="load-test-models">
+                        <th scope="row" class="border border-white px-4 py-2 font-normal">Model</th>
+                    </tr>
+                    <tr id="load-test-all">
+                        <th scope="row" class="border border-white px-4 py-2 font-normal">All rounds</th>
+                    </tr>
+                </tbody>
+                <tbody id="load-test-rounds"></tbody>
+            </table>
+        </div>
+    </fieldset>
+</main>
+
+<template id="load-test-action">
+    <td class="border border-white px-4 py-2">
+        <button type="button" class="border border-white px-2 py-0.5 text-xs enabled:hover:bg-white enabled:hover:text-black disabled:opacity-40"></button>
+    </td>
+</template>
+
+<template id="load-test-cell">
+    <td class="border border-white px-4 py-2">
+        <div class="flex items-center justify-between gap-3">
+            <span class="tabular-nums" data-time>—</span>
+            <button type="button" class="border border-white px-2 py-0.5 text-xs enabled:hover:bg-white enabled:hover:text-black disabled:opacity-40">Run</button>
+        </div>
+    </td>
+</template>
+
+<script type="module">
+    import runAudio from "/assets/load-tests/audio.js";
+    import runDecision from "/assets/load-tests/decision.js";
+    import runEmbedding from "/assets/load-tests/embedding.js";
+    import runImage from "/assets/load-tests/image.js";
+    import { MAX_LOAD_ROUND } from "/assets/load-tests/load-test.js";
+    import runText from "/assets/load-tests/text.js";
+    import runVideo from "/assets/load-tests/video.js";
+    import { catalogUrl, requestJson, setModelLoaded } from "/assets/model-api.js";
+
+    const loadTests = {
+        Audio: runAudio,
+        Decision: runDecision,
+        Embedding: runEmbedding,
+        Image: runImage,
+        Text: runText,
+        Video: runVideo,
+    };
+    const loadControls = document.querySelector("#load-test-controls");
+    const loadHead = document.querySelector("#load-test-head");
+    const loadModels = document.querySelector("#load-test-models");
+    const loadAll = document.querySelector("#load-test-all");
+    const loadRounds = document.querySelector("#load-test-rounds");
+    const loadStatus = document.querySelector("#load-test-status");
+    const loadActionTemplate = document.querySelector("#load-test-action");
+    const loadCellTemplate = document.querySelector("#load-test-cell");
+    /** @typedef {{id: string, modality: string, loaded: boolean}} CatalogModel */
+    /** @typedef {{button: HTMLButtonElement, model: CatalogModel | null}} ModelControl */
+    /** @type {Map<string, ModelControl>} */
+    const modelControls = new Map();
+    const durationFormat = new Intl.NumberFormat(undefined, {
+        style: "unit",
+        unit: "second",
+        maximumFractionDigits: 3,
+    });
+
+    for (const label of Object.keys(loadTests)) {
+        const header = document.createElement("th");
+        header.scope = "col";
+        header.className = "border border-white px-4 py-2";
+        header.textContent = label;
+        loadHead.append(header);
+
+        const modelCell = loadActionTemplate.content.firstElementChild.cloneNode(true);
+        const modelButton = modelCell.querySelector("button");
+        modelButton.dataset.modality = label;
+        modelButton.textContent = "Load";
+        modelButton.disabled = true;
+        modelControls.set(label, { button: modelButton, model: null });
+        loadModels.append(modelCell);
+
+        const runCell = loadActionTemplate.content.firstElementChild.cloneNode(true);
+        const runButton = runCell.querySelector("button");
+        runButton.textContent = "Run all";
+        runButton.dataset.modality = label;
+        runButton.setAttribute("aria-label", `Run all ${label.toLowerCase()} load rounds`);
+        loadAll.append(runCell);
+    }
+    for (let round = 1; round <= MAX_LOAD_ROUND; round++) {
+        const row = loadRounds.insertRow();
+        const heading = document.createElement("th");
+        heading.scope = "row";
+        heading.className = "border border-white px-4 py-2 font-normal tabular-nums";
+        heading.textContent = `Round ${round}`;
+        row.append(heading);
+        for (const label of Object.keys(loadTests)) {
+            const cell = loadCellTemplate.content.firstElementChild.cloneNode(true);
+            const button = cell.querySelector("button");
+            button.dataset.modality = label;
+            button.dataset.round = round;
+            button.setAttribute("aria-label", `Run ${label.toLowerCase()} load round ${round}`);
+            row.append(cell);
+        }
+    }
+
+    /**
+     * Show the next available runtime action for a modality.
+     * @param {string} label Modality column heading.
+     * @param {ModelControl} control Model selection and its Load/Unload button.
+     */
+    function updateModelButton(label, { button, model }) {
+        const action = model?.loaded ? "Unload" : "Load";
+        button.textContent = action;
+        button.setAttribute("aria-label", `${action} ${label.toLowerCase()} model`);
+        button.disabled = model === null;
+    }
+
+    /** Refresh model availability before the user can start a load test. */
+    async function refreshModels() {
+        /** @type {{data: CatalogModel[]}} */
+        const { data: models } = await requestJson(catalogUrl);
+        for (const [label, control] of modelControls) {
+            const candidates = models.filter(model => model.modality === label.toLowerCase());
+            control.model = candidates.find(model => model.loaded) ?? candidates[0] ?? null;
+            updateModelButton(label, control);
+        }
+    }
+
+    loadControls.addEventListener("click", async event => {
+        const button = event.target.closest("button[data-modality]");
+        if (!button || loadControls.disabled) return;
+        const label = button.dataset.modality;
+        const modality = label.toLowerCase();
+        const control = modelControls.get(label);
+        loadControls.disabled = true;
+        try {
+            if (button === control.button) {
+                const model = control.model;
+                if (!model) return;
+                const shouldLoad = !model.loaded;
+                button.textContent = shouldLoad ? "Loading…" : "Unloading…";
+                loadStatus.textContent = `${shouldLoad ? "Loading" : "Unloading"} ${model.id}…`;
+                const result = await setModelLoaded(model.id, shouldLoad);
+                model.loaded = result.loaded;
+                loadStatus.textContent = `${model.id} is ${result.loaded ? "loaded" : "unloaded"}.`;
+                return;
+            }
+
+            loadStatus.textContent = "Checking loaded models…";
+            await refreshModels();
+            if (!control.model?.loaded) {
+                loadStatus.textContent = `Load the ${modality} model first.`;
+                return;
+            }
+            const modelId = control.model.id;
+            const firstRound = Number(button.dataset.round ?? 1);
+            const lastRound = Number(button.dataset.round ?? MAX_LOAD_ROUND);
+            const column = button.closest("td, th").cellIndex;
+            for (let round = firstRound; round <= lastRound; round++) {
+                const time = loadRounds.rows[round - 1].cells[column].querySelector("[data-time]");
+                time.removeAttribute("title");
+                time.textContent = "Running…";
+                loadStatus.textContent = `Running ${label} round ${round} with ${modelId}…`;
+                try {
+                    const elapsed = await loadTests[label](round, modelId);
+                    time.textContent = durationFormat.format(elapsed / 1000);
+                    time.title = modelId;
+                } catch (error) {
+                    time.textContent = "Failed";
+                    time.title = error.message;
+                    loadStatus.textContent = `${label} round ${round} failed. ${error.message}`;
+                    return;
+                }
+            }
+            const rounds = firstRound === lastRound ? `round ${firstRound}` : `rounds ${firstRound}–${lastRound}`;
+            loadStatus.textContent = `${label} ${rounds} completed with ${modelId}.`;
+        } catch (error) {
+            loadStatus.textContent = error.message;
+        } finally {
+            updateModelButton(label, control);
+            loadControls.disabled = false;
+        }
+    });
+
+    try {
+        await refreshModels();
+        loadStatus.textContent = "";
+    } catch (error) {
+        loadStatus.textContent = error.message;
+    } finally {
+        loadControls.disabled = false;
+    }
+</script>
+</body>
+</html>

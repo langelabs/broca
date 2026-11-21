@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Check uv lockfile
+        run: uv lock --check
+
+      - name: Run Ruff
+        run: uv run --locked ruff check .
+
+      - name: Run pytest
+        run: uv run --locked --extra ai pytest -q
+
+      - name: Run JavaScript tests
+        run: node --test tests/*.mjs
+
+      - name: Build package
+        run: uv build

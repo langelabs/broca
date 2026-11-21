@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lange Labs AI Dashboard</title>
+    <script
+            defer
+            src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js"
+            integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg"
+            crossorigin="anonymous"
+    ></script>
+    <script
+            defer
+            src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.5"
+            integrity="sha384-7t++RelBZUKYuVklRj4VH35EUtPrDekGESbbngrE48HnxerJNvab7Fb1W+QhFvNa"
+            crossorigin="anonymous"
+    ></script>
+    <style type="text/tailwindcss">
+        .model-action {
+            @apply absolute inset-0 h-full w-full px-4 text-center font-medium
+                enabled:cursor-pointer enabled:hover:brightness-125
+                focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white;
+        }
+        .model-action[data-state="ready"] { @apply bg-green-800; }
+        .model-action[data-state="idle"] { @apply bg-red-800; }
+        .model-action[data-state="pending"] { @apply bg-orange-400 text-black; }
+    </style>
+</head>
+<body class="min-h-screen bg-black p-4 text-white sm:p-8">
+<main>
+    <header class="mb-16 flex flex-wrap items-baseline justify-between gap-4">
+        <h1 class="text-5xl font-bold">Lange Labs AI</h1>
+        <a href="/tests/load" class="underline underline-offset-4">Load tests</a>
+    </header>
+
+    <section class="mb-6" aria-label="VRAM">
+        <div class="mb-2 flex justify-between gap-4 text-sm tabular-nums">
+            <span id="total-vram">Total VRAM —</span>
+            <span id="used-vram">Used VRAM —</span>
+        </div>
+        <div id="vram-bar" class="h-11 border border-white" role="progressbar"
+             aria-label="VRAM usage" aria-valuemin="0" aria-valuemax="100">
+            <div id="vram-fill" class="h-full bg-white" style="width: 0%"></div>
+        </div>
+    </section>
+
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse whitespace-nowrap text-left" aria-label="Models">
+            <thead>
+                <tr>
+                    <th scope="col" class="border border-white px-4 py-2">Model ID</th>
+                    <th scope="col" class="border border-white px-4 py-2" title="Estimated resident memory">Size</th>
+                    <th scope="col" class="w-44 border border-white px-4 py-2 text-center">Downloaded</th>
+                    <th scope="col" class="w-36 border border-white px-4 py-2 text-center">Loaded</th>
+                    <th scope="col" class="w-28 border border-white px-4 py-2 text-center">Test</th>
+                </tr>
+            </thead>
+            <tbody id="models"></tbody>
+        </table>
+    </div>
+    <p id="model-status" class="mt-3 text-sm empty:hidden" role="status">Loading models…</p>
+</main>
+
+<template id="model-row">
+    <tr class="h-11">
+        <th scope="row" class="border border-white px-4 py-2 font-normal" data-id></th>
+        <td class="border border-white px-4 py-2 tabular-nums" data-size></td>
+        <td class="relative min-w-44 border border-white">
+            <button type="button" class="model-action" data-download></button>
+        </td>
+        <td class="relative min-w-36 border border-white">
+            <button type="button" class="model-action" data-load></button>
+        </td>
+        <td class="border border-white px-4 py-2 text-center">
+            <a class="underline underline-offset-4" data-test>Open</a>
+        </td>
+    </tr>
+</template>
+
+<script type="module">
+    import { catalogUrl, requestJson, setModelLoaded } from "/assets/model-api.js";
+
+    const rows = document.querySelector("#models");
+    const template = document.querySelector("#model-row");
+    const status = document.querySelector("#model-status");
+    const totalVram = document.querySelector("#total-vram");
+    const usedVram = document.querySelector("#used-vram");
+    const vramBar = document.querySelector("#vram-bar");
+    const vramFill = document.querySelector("#vram-fill");
+    const modelRows = new Map();
+    const sizeFormat = new Intl.NumberFormat(undefined, {
+        style: "unit",
+        unit: "gigabyte",
+        maximumFractionDigits: 2,
+    });
+
+    /**
+     * Set the cell button's visible status and availability.
+     * @param {HTMLButtonElement} button
+     * @param {string} label
+     * @param {"ready" | "idle" | "pending"} state
+     * @param {boolean} disabled
+     */
+    function showAction(button, label, state, disabled) {
+        button.textContent = label;
+        button.dataset.state = state;
+        button.disabled = disabled;
+    }
+
+    /** Render the model state and any in-flight action on the row. */
+    function updateRow(entry) {
+        const { model, pending, downloadButton, loadButton } = entry;
+        const progress = Number.isFinite(model.download_progress)
+            ? Math.max(0, Math.min(1, model.download_progress))
+            : null;
+        const downloading = pending === "download" || (!model.downloaded && progress > 0);
+        const downloadLabel = progress === null ? "Downloading…"
+            : `Downloading ${Math.floor(progress * 100)}%`;
+        showAction(
+            downloadButton,
+            downloading ? downloadLabel : model.downloaded ? "Downloaded" : "Download",
+            downloading ? "pending" : model.downloaded ? "ready" : "idle",
+            downloading || model.downloaded || pending !== null,
+        );
+        const pendingLoad = pending === "load" || pending === "unload";
+        showAction(
+            loadButton,
+            pendingLoad ? (pending === "load" ? "Loading…" : "Unloading…") : model.loaded ? "Unload" : "Load",
+            pendingLoad ? "pending" : model.loaded ? "ready" : "idle",
+            pending !== null,
+        );
+    }
+
+    /**
+     * Apply a model action and update the row with the server result.
+     * @param {{model: {id: string, downloaded: boolean, download_progress: number, loaded: boolean}, pending: null | "download" | "load" | "unload", revision: number}} entry
+     * @param {"download" | "load" | "unload"} action
+     */
+    async function changeModel(entry, action) {
+        if (entry.pending !== null) return;
+        entry.pending = action;
+        entry.revision++;
+        status.textContent = "";
+        updateRow(entry);
+        try {
+            if (action === "download") {
+                const modelUrl = `${catalogUrl}/${encodeURIComponent(entry.model.id)}`;
+                const result = await requestJson(`${modelUrl}/download`, { method: "POST" });
+                entry.model.downloaded = result.downloaded;
+                entry.model.download_progress = result.downloaded ? 1 : 0;
+            } else {
+                const result = await setModelLoaded(entry.model.id, action === "load");
+                entry.model.loaded = result.loaded;
+            }
+        } catch (error) {
+            if (action === "download") entry.model.download_progress = 0;
+            status.textContent = error.message;
+        } finally {
+            entry.pending = null;
+            entry.revision++;
+            updateRow(entry);
+        }
+    }
+
+    let refreshingModels = false;
+    /** Refresh the catalog without overwriting a more recent action result. */
+    async function refreshModels() {
+        if (refreshingModels) return;
+        refreshingModels = true;
+        const revisions = new Map([...modelRows].map(([id, entry]) => [id, entry.revision]));
+        try {
+            const { data: models } = await requestJson(catalogUrl);
+            if (!modelRows.size) status.textContent = "";
+            for (const model of models) {
+                let entry = modelRows.get(model.id);
+                if (entry && entry.revision !== revisions.get(model.id)) continue;
+                if (!entry) {
+                    const row = template.content.firstElementChild.cloneNode(true);
+                    const downloadButton = row.querySelector("[data-download]");
+                    const loadButton = row.querySelector("[data-load]");
+                    const link = row.querySelector("[data-test]");
+                    row.querySelector("[data-id]").textContent = model.id;
+                    link.href = `/${encodeURIComponent(model.modality)}?model=${encodeURIComponent(model.id)}`;
+                    link.setAttribute("aria-label", `Test ${model.id}`);
+                    entry = { model, row, downloadButton, loadButton, pending: null, revision: 0 };
+                    downloadButton.addEventListener("click", () => changeModel(entry, "download"));
+                    loadButton.addEventListener("click", () => changeModel(entry, entry.model.loaded ? "unload" : "load"));
+                    modelRows.set(model.id, entry);
+                    rows.append(row);
+                }
+                entry.model = model;
+                entry.row.querySelector("[data-size]").textContent =
+                    model.size === null ? "—" : sizeFormat.format(model.size / 1e9);
+                updateRow(entry);
+            }
+        } catch (error) {
+            if (!modelRows.size) status.textContent = error.message;
+        } finally {
+            refreshingModels = false;
+        }
+    }
+
+    let refreshingVram = false;
+    /** Update the VRAM labels and the proportional white fill. */
+    async function refreshVram() {
+        if (refreshingVram) return;
+        refreshingVram = true;
+        try {
+            const { max_vram_bytes: total, used_vram_bytes: used } = await requestJson("/system");
+            const percent = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+            totalVram.textContent = `Total VRAM ${sizeFormat.format(total / 1e9)}`;
+            usedVram.textContent = `Used VRAM ${sizeFormat.format(used / 1e9)}`;
+            vramFill.style.width = `${percent}%`;
+            vramBar.setAttribute("aria-valuenow", Math.round(percent));
+        } catch {
+            totalVram.textContent = "Total VRAM —";
+            usedVram.textContent = "Used VRAM —";
+            vramFill.style.width = "0%";
+            vramBar.removeAttribute("aria-valuenow");
+        } finally {
+            refreshingVram = false;
+        }
+    }
+
+    refreshModels();
+    refreshVram();
+    setInterval(() => {
+        refreshModels();
+        refreshVram();
+    }, 2000);
+</script>
+
+</body>
+</html>
