@@ -1,6 +1,6 @@
 FROM ghcr.io/astral-sh/uv:0.11.14 AS uv
 
-FROM ubuntu:24.04 AS build
+FROM ubuntu:26.04 AS build
 WORKDIR /build
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
@@ -25,7 +25,7 @@ COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY broca/ broca/
 RUN uv --no-cache sync --python /usr/bin/python3.12 --locked --no-default-groups --no-editable
 
-FROM ubuntu:24.04 AS runtime
+FROM ubuntu:26.04 AS runtime
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates libgomp1 libstdc++6 python3.12 \
     && rm -rf /var/lib/apt/lists/* \
