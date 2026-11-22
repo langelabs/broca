@@ -14,6 +14,7 @@ from diffusers.modular_pipelines.flux3.modular_pipeline import Flux3ModularPipel
 from diffusers.modular_pipelines.modular_pipeline import PipelineState
 from PIL import Image
 
+from ...ai_model import AiModel
 from .._pipelines import Flux3Pipeline
 from .._pipelines.flux3 import flux_step_callback
 from ._model import _model
@@ -37,6 +38,13 @@ class ImagePipeline(Flux3Pipeline[str, ImageResult]):
 
     # FLUX generates one image at a time. Publish each final result independently.
     _max_batch_size = 1
+
+    def __init__(self, model: AiModel = _model) -> None:
+        """Initialize the pipeline with a compatible model configuration.
+
+        :param model: Model to use. Defaults to the built-in configuration.
+        """
+        super().__init__(model)
 
     async def _infer(
         self,
@@ -147,4 +155,4 @@ class ImagePipeline(Flux3Pipeline[str, ImageResult]):
         )
 
 
-pipeline = ImagePipeline(_model)
+pipeline = ImagePipeline()

@@ -107,34 +107,30 @@ name = "broca"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "certifi", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "fastapi", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "filelock", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "huggingface-hub", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "idna", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "pydantic", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "python-multipart", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "tqdm", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "uvicorn", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-]
-
-[package.optional-dependencies]
-ai = [
     { name = "accelerate", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "av", version = "18.1.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and sys_platform == 'darwin')" },
     { name = "av", version = "19.0.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'darwin')" },
+    { name = "certifi", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "diffusers", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "fastapi", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "filelock", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "ftfy", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "gguf", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "huggingface-hub", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "idna", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "llama-cpp-python", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "pillow", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "protobuf", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "pydantic", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "python-multipart", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "safetensors", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "sentence-transformers", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "sentencepiece", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "torch", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "torchvision", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "tqdm", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "transformers", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "uvicorn", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
 ]
 
 [package.dev-dependencies]
@@ -149,31 +145,30 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "accelerate", marker = "extra == 'ai'", specifier = ">=1.12,<2" },
-    { name = "av", marker = "extra == 'ai'", specifier = ">=16,<20" },
+    { name = "accelerate", specifier = ">=1.12,<2" },
+    { name = "av", specifier = ">=16,<20" },
     { name = "certifi", specifier = ">=2026.10.18" },
-    { name = "diffusers", marker = "extra == 'ai'", specifier = ">=0.43,<0.44" },
+    { name = "diffusers", specifier = ">=0.43,<0.44" },
     { name = "fastapi", specifier = ">=0.163.1" },
     { name = "filelock", specifier = ">=3.0.0" },
-    { name = "ftfy", marker = "extra == 'ai'", specifier = ">=6.3,<7" },
-    { name = "gguf", marker = "extra == 'ai'", specifier = ">=0.19,<1" },
+    { name = "ftfy", specifier = ">=6.3,<7" },
+    { name = "gguf", specifier = ">=0.19,<1" },
     { name = "huggingface-hub", specifier = ">=2.4.0" },
     { name = "idna", specifier = ">=3.15" },
-    { name = "llama-cpp-python", marker = "extra == 'ai'", specifier = ">=0.3.37,<0.4" },
-    { name = "pillow", marker = "extra == 'ai'" },
-    { name = "protobuf", marker = "extra == 'ai'", specifier = ">=5" },
+    { name = "llama-cpp-python", specifier = ">=0.3.37,<0.4" },
+    { name = "pillow" },
+    { name = "protobuf", specifier = ">=5" },
     { name = "pydantic", specifier = ">=2.0.0,<3.0.0" },
     { name = "python-multipart", specifier = ">=0.0.32,<1" },
-    { name = "safetensors", marker = "extra == 'ai'", specifier = ">=0.8,<1" },
-    { name = "sentence-transformers", marker = "extra == 'ai'", specifier = ">=6.1,<7" },
-    { name = "sentencepiece", marker = "extra == 'ai'", specifier = ">=0.2,<1" },
-    { name = "torch", marker = "extra == 'ai'", specifier = ">=2.10,<3" },
-    { name = "torchvision", marker = "extra == 'ai'", specifier = ">=0.25,<1" },
+    { name = "safetensors", specifier = ">=0.8,<1" },
+    { name = "sentence-transformers", specifier = ">=6.1,<7" },
+    { name = "sentencepiece", specifier = ">=0.2,<1" },
+    { name = "torch", specifier = ">=2.10,<3" },
+    { name = "torchvision", specifier = ">=0.25,<1" },
     { name = "tqdm", specifier = ">=4.67.0" },
-    { name = "transformers", marker = "extra == 'ai'", specifier = ">=5.17,<6" },
+    { name = "transformers", specifier = ">=5.17,<6" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
-provides-extras = ["ai"]
 
 [package.metadata.requires-dev]
 benchmarks = [{ name = "openai" }]

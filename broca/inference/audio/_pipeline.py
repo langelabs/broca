@@ -6,6 +6,7 @@ from io import BytesIO
 import av
 import torch
 
+from ...ai_model import AiModel
 from .._pipelines import BarkPipeline
 from ._model import _model
 from ._types import AudioOptions, AudioResult, AudioVoice
@@ -13,6 +14,13 @@ from ._types import AudioOptions, AudioResult, AudioVoice
 
 class AudioPipeline(BarkPipeline[str, AudioResult]):
     """Synthesize speech using the configured Bark runtime."""
+
+    def __init__(self, model: AiModel = _model) -> None:
+        """Initialize the pipeline with a compatible model configuration.
+
+        :param model: Model to use. Defaults to the built-in configuration.
+        """
+        super().__init__(model)
 
     async def _infer(
         self,
@@ -91,4 +99,4 @@ class AudioPipeline(BarkPipeline[str, AudioResult]):
         )
 
 
-pipeline = AudioPipeline(_model)
+pipeline = AudioPipeline()

@@ -10,6 +10,7 @@ from typing import cast
 from llama_cpp import llama_cpp as native
 from llama_cpp.llama_chat_format import Gemma4ChatHandler, Jinja2ChatFormatter
 
+from ...ai_model import AiModel
 from .._pipelines import LlamaPipeline
 from .._pipelines.__base import InferenceCall
 from ._batch import BatchLlama, CompletionOptions, TextSequence
@@ -27,6 +28,13 @@ class TextPipeline(LlamaPipeline[str | TextRequest, TextResult]):
     """Generate chat responses using the configured Gemma runtime."""
 
     _runtime_class = BatchLlama
+
+    def __init__(self, model: AiModel = _model) -> None:
+        """Initialize the pipeline with a compatible model configuration.
+
+        :param model: Model to use. Defaults to the built-in configuration.
+        """
+        super().__init__(model)
 
     async def _infer(
         self,
@@ -342,4 +350,4 @@ class TextPipeline(LlamaPipeline[str | TextRequest, TextResult]):
         return [results[index] for index in range(len(inputs))]
 
 
-pipeline = TextPipeline(_model)
+pipeline = TextPipeline()

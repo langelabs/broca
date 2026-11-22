@@ -1,0 +1,53 @@
+name: Build and smoke-test Mesh
+description: Build Broca for Linux x86-64 and verify it starts without a GPU or network access.
+inputs:
+  version:
+    description: Version label for the built image.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Build the image
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        docker build --platform linux/amd64 --provenance=false --tag broca-mesh:ci \
+          --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+          --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+          --label "org.opencontainers.image.version=${VERSION}" .
+
+    - name: Smoke-test startup and CPU fallback
+      shell: bash
+      run: |
+        container=$(docker run --detach --network none broca-mesh:ci)
+        trap 'docker logs "$container"; docker rm --force "$container" >/dev/null' EXIT
+        docker exec -i "$container" python - <<'PY'
+        from ctypes import CDLL
+        import json
+        import os
+        from pathlib import Path
+        from time import sleep
+        from urllib.error import URLError
+        from urllib.request import urlopen
+
+        import llama_cpp
+
+        assert os.getuid() != 0
+        assert os.access(Path.home() / "ai", os.W_OK)
+        CDLL(str(Path(llama_cpp.__file__).parent / "lib" / "libggml-cuda.so"))
+
+        for attempt in range(60):
+            try:
+                with urlopen("http://127.0.0.1:9001/openapi.json", timeout=2) as response:
+                    assert "/system" in json.load(response)["paths"]
+                break
+            except URLError:
+                if attempt == 59:
+                    raise
+                sleep(1)
+
+        with urlopen("http://127.0.0.1:9001/system", timeout=45) as response:
+            assert json.load(response) == {"max_vram_bytes": 0, "used_vram_bytes": 0}
+        PY

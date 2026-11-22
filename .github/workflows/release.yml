@@ -1,0 +1,168 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: broca-release
+  queue: max
+
+env:
+  MESH_IMAGE: docker.io/lange-labs/mesh
+
+jobs:
+  package:
+    name: Validate release and build distributions
+    if: github.repository == 'langelabs/broca' && !github.event.release.prerelease
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release tag and source
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [[ "$GITHUB_REF" != "refs/tags/$TAG" ]]; then
+            echo 'The release does not refer to the workflow tag.' >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo 'The release commit must be on main.' >&2
+            exit 1
+          fi
+          version=$(python3 .github/scripts/release_version.py -- "$TAG")
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: '0.11.14'
+          enable-cache: false
+
+      - name: Build and check Python distributions
+        run: |
+          uv lock --check
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export SOURCE_DATE_EPOCH
+          uv build --python 3.12
+          uvx --from twine==6.2.0 twine check --strict dist/*
+
+      - name: Upload the wheel and source distribution
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: broca-distributions
+          path: dist/
+          if-no-files-found: error
+          overwrite: true
+
+  dockerhub:
+    name: Publish versioned image
+    needs: package
+    runs-on: ubuntu-24.04
+    environment: dockerhub
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Build and smoke-test the image
+        uses: ./.github/actions/build-mesh
+        with:
+          version: ${{ needs.package.outputs.version }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push the version tag and record its digest
+        id: publish
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          digest=$(bash .github/scripts/push_mesh.sh "${MESH_IMAGE}:${VERSION}" "$GITHUB_SHA")
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+
+  pypi:
+    name: Publish Broca to PyPI
+    needs: dockerhub
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/broca/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Fetch the validated distributions
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: broca-distributions
+          path: dist/
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: '0.11.14'
+          enable-cache: false
+
+      - name: Publish through PyPI Trusted Publishing
+        run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/ dist/*
+
+  latest:
+    name: Promote the latest GitHub release on Docker Hub
+    needs: [dockerhub, pypi]
+    runs-on: ubuntu-24.04
+    environment: dockerhub
+
+    steps:
+      - name: Check GitHub's latest published release
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ github.event.release.id }}
+        run: |
+          if latest_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.id' 2>&1); then
+            if [[ "$latest_id" == "$RELEASE_ID" ]]; then
+              echo 'promote=true' >> "$GITHUB_OUTPUT"
+            fi
+          elif [[ "$latest_id" != *'(HTTP 404)'* ]]; then
+            echo "$latest_id" >&2
+            exit 1
+          fi
+
+      - name: Log in to Docker Hub
+        if: steps.latest.outputs.promote == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Promote and verify the published digest
+        if: steps.latest.outputs.promote == 'true'
+        env:
+          DIGEST: ${{ needs.dockerhub.outputs.digest }}
+        run: |
+          docker buildx imagetools create --prefer-index=false \
+            --tag "${MESH_IMAGE}:latest" "${MESH_IMAGE}@${DIGEST}"
+          latest_digest=$(docker buildx imagetools inspect --format '{{json .Manifest}}' "${MESH_IMAGE}:latest" | jq -er '.digest')
+          test "$latest_digest" = "$DIGEST"
