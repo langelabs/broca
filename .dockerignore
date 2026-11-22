@@ -1,0 +1,11 @@
+**
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!broca/
+!broca/**
+broca/**/__pycache__/
+broca/**/*.pyc
+broca/**/.env
+broca/**/.env.*

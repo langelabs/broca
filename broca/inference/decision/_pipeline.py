@@ -4,6 +4,7 @@ import json
 
 from pydantic import JsonValue, TypeAdapter
 
+from ...ai_model import AiModel
 from .._pipelines import BekkoPipeline
 from ._model import _model
 from ._types import DecisionOptions, DecisionRequest, DecisionResult
@@ -13,6 +14,13 @@ result_adapter: TypeAdapter[DecisionResult] = TypeAdapter(DecisionResult)
 
 class DecisionPipeline(BekkoPipeline[DecisionRequest, DecisionResult]):
     """Evaluate typed decisions using the configured Bekko runtime."""
+
+    def __init__(self, model: AiModel = _model) -> None:
+        """Initialize the pipeline with a compatible model configuration.
+
+        :param model: Model to use. Defaults to the built-in configuration.
+        """
+        super().__init__(model)
 
     async def _infer(
         self,
@@ -78,4 +86,4 @@ class DecisionPipeline(BekkoPipeline[DecisionRequest, DecisionResult]):
         return result_adapter.validate_python({"kind": decision.kind, **result})
 
 
-pipeline = DecisionPipeline(_model)
+pipeline = DecisionPipeline()
