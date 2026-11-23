@@ -110,6 +110,15 @@ class EmbeddingPipeline(LlamaPipeline[list[EmbeddingInput], EmbeddingResult]):
                     vectors=vectors,
                     dimensions=request.dimensions,
                     normalized=request.normalize,
+                    prompt_tokens=(
+                        sum(
+                            len(runtime.tokenize(item.encode("utf-8")))
+                            for item in request.inputs
+                            if isinstance(item, str)
+                        )
+                        if all(isinstance(item, str) for item in request.inputs)
+                        else None
+                    ),
                 )
             )
         return results
