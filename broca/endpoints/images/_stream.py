@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from fastapi.responses import StreamingResponse
 from starlette.types import Send
 
-from ...inference.images._types import ImageOptions
+from ...inference.images.types import ImageOptions
 
 if TYPE_CHECKING:
     from ...inference.images._pipeline import ImagePipeline

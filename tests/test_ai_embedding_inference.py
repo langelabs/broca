@@ -9,7 +9,7 @@ from broca.inference._pipelines import llama_pipeline
 from broca.inference.embedding import _pipeline as embedding_pipeline
 from broca.inference.embedding._model import _model
 from broca.inference.embedding._pipeline import EmbeddingPipeline
-from broca.inference.embedding._types import (
+from broca.inference.embedding.types import (
     AudioEmbeddingInput,
     EmbeddingOptions,
     EmbeddingResult,

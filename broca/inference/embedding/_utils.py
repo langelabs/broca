@@ -7,7 +7,7 @@ from typing import cast
 from llama_cpp import Llama, llama_cpp as native
 from pydantic import JsonValue
 
-from ._types import EmbeddingInput, EmbeddingOptions, EmbeddingRequest
+from .types import EmbeddingInput, EmbeddingOptions, EmbeddingRequest
 
 
 _TASK_PROMPTS = {

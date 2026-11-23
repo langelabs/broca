@@ -4,11 +4,12 @@ from collections.abc import Sequence
 from math import hypot
 from typing import cast
 
+from ...ai_model import AiModel
 from .._pipelines import LlamaPipeline
 from .._pipelines.__base import InferenceCall
 from ._media import embed_media
 from ._model import _model
-from ._types import (
+from .types import (
     EmbeddingInput,
     EmbeddingOptions,
     EmbeddingRequest,
@@ -20,6 +21,13 @@ from ._utils import prepare_request
 
 class EmbeddingPipeline(LlamaPipeline[list[EmbeddingInput], EmbeddingResult]):
     """Embed text and media using the configured EmbeddingGemma runtime."""
+
+    def __init__(self, model: AiModel = _model) -> None:
+        """Initialize the pipeline with a compatible model configuration.
+
+        :param model: Model to use. Defaults to the built-in configuration.
+        """
+        super().__init__(model)
 
     async def _infer(
         self,
@@ -107,4 +115,4 @@ class EmbeddingPipeline(LlamaPipeline[list[EmbeddingInput], EmbeddingResult]):
         return results
 
 
-pipeline = EmbeddingPipeline(_model)
+pipeline = EmbeddingPipeline()

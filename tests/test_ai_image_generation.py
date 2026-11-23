@@ -17,7 +17,7 @@ from starlette.requests import ClientDisconnect
 from broca.endpoints.images import images_router
 from broca.inference._pipelines.flux3 import flux_step_callback
 from broca.inference.images._pipeline import pipeline
-from broca.inference.images._types import ImageOptions, ImageResult
+from broca.inference.images.types import ImageOptions, ImageResult
 
 
 @pytest.fixture

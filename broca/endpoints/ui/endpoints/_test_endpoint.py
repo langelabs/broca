@@ -59,7 +59,7 @@ async def run_model_test(modality: ModelModality, body: ModelTestRequest) -> Res
                 from ....inference.decision._pipeline import (
                     pipeline as decision_pipeline,
                 )
-                from ....inference.decision._types import DecisionRequest
+                from ....inference.decision.types import DecisionRequest
 
                 decision = await decision_pipeline.infer(
                     DecisionRequest.model_validate_json(body.input)

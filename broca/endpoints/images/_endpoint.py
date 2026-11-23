@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from ...inference import is_model_loaded
 from ...inference.images import _model
-from ...inference.images._types import ImageOptions, RasterFormat
+from ...inference.images.types import ImageOptions, RasterFormat
 from ._request import ImageGenerationRequest
 from ._response import GeneratedImage, ImageGenerationResponse
 from ._router import images_router

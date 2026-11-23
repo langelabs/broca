@@ -8,6 +8,7 @@ import av
 import torch
 from PIL import Image
 
+from ...ai_model import AiModel
 from .._pipelines import WanPipeline
 from ._model import _model
 from ._types import VideoOptions, VideoResult
@@ -15,6 +16,13 @@ from ._types import VideoOptions, VideoResult
 
 class VideoPipeline(WanPipeline[str, VideoResult]):
     """Generate video using the configured Wan runtime."""
+
+    def __init__(self, model: AiModel = _model) -> None:
+        """Initialize the pipeline with a compatible model configuration.
+
+        :param model: Model to use. Defaults to the built-in configuration.
+        """
+        super().__init__(model)
 
     async def _infer(
         self,
@@ -112,4 +120,4 @@ class VideoPipeline(WanPipeline[str, VideoResult]):
         )
 
 
-pipeline = VideoPipeline(_model)
+pipeline = VideoPipeline()

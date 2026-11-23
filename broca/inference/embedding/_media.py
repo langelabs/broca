@@ -12,7 +12,7 @@ import av
 from llama_cpp import Llama, llama_cpp as native, mtmd_cpp as mtmd
 from llama_cpp.llama_chat_format import Gemma4ChatHandler
 
-from ._types import MediaEmbeddingInput
+from .types import MediaEmbeddingInput
 from ._utils import decode_media_batch, set_embedding_row
 
 

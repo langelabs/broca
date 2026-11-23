@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, FiniteFloat, NonNegativeInt
 
-from ...inference.decision._types import Probability
+from broca.inference.decision.types import Probability
 from ._request import ChoiceValue
 
 
