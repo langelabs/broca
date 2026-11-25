@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:0.11.14 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.9 AS uv
 
 FROM ubuntu:24.04 AS build
 WORKDIR /build
