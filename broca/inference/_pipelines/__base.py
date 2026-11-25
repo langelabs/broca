@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from itertools import count, islice
 from threading import Condition, RLock, Thread
 from time import monotonic
-from typing import Any, ClassVar, Generic, TypeVar, cast
+from typing import Any, ClassVar, Generic, TypeVar, cast, Sequence
 
 import torch
 
@@ -273,3 +273,25 @@ class BasePipeline(ABC, Generic[Runtime, Input, Result]):
     def _open_runtime(self) -> AbstractContextManager[Runtime]:
         """Create a backend context that releases resources when it exits."""
         raise NotImplementedError
+
+
+    def encode(self, text: str) -> list[int]:
+        """Convert text to token IDs without adding sequence markers.
+
+        :param text: Text to tokenize as UTF-8.
+        :returns: Token IDs from the embedding model's vocabulary.
+        :raises RuntimeError: If the embedding pipeline is unloaded.
+        """
+        with self._compute_lock:
+            return self.runtime.tokenize(text.encode("utf-8"), add_bos=False)
+
+    def decode(self, tokens: Sequence[int]) -> str:
+        """Decode token IDs with the embedding model's vocabulary.
+
+        :param tokens: Token IDs to decode.
+        :returns: Text with replacement characters for incomplete UTF-8 sequences.
+        :raises RuntimeError: If the embedding pipeline is unloaded.
+        """
+        with self._compute_lock:
+            data = self.runtime.detokenize(list(tokens))
+        return data.decode("utf-8", errors="replace")

@@ -1,30 +1,9 @@
-"""Response for the OpenAI-compatible video creation endpoint."""
+"""Binary MP4 response for video generation."""
 
-from typing import Literal
-
-from pydantic import BaseModel, Field, NonNegativeInt
+from fastapi import Response
 
 
-class VideoError(BaseModel):
-    """Describe a failed video job."""
+class VideoResponse(Response):
+    """Send encoded MP4 bytes as the HTTP response body."""
 
-    code: str
-    message: str
-
-
-class VideoResponse(BaseModel):
-    """Return the status of the asynchronous video generation job."""
-
-    id: str
-    object: Literal["video"] = "video"
-    model: str
-    status: Literal["queued", "in_progress", "completed", "failed"]
-    progress: int = Field(ge=0, le=100)
-    created_at: NonNegativeInt
-    size: str
-    seconds: str
-    prompt: str | None = None
-    completed_at: NonNegativeInt | None = None
-    expires_at: NonNegativeInt | None = None
-    error: VideoError | None = None
-    remixed_from_video_id: str | None = None
+    media_type = "video/mp4"

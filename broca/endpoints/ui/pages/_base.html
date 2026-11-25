@@ -41,6 +41,10 @@
     </form>
     <p id="test-status" class="empty:hidden" role="status">Loading models…</p>
     <div id="test-result"></div>
+    <section id="image-previews" aria-labelledby="image-previews-title" class="space-y-3" hidden>
+        <h2 id="image-previews-title" class="text-lg font-semibold">Intermediate previews</h2>
+        <ol id="image-preview-list" class="grid grid-cols-2 gap-4"></ol>
+    </section>
 </main>
 
 <script type="module">
@@ -53,6 +57,8 @@
     const button = document.querySelector("#run-test");
     const status = document.querySelector("#test-status");
     const output = document.querySelector("#test-result");
+    const imagePreviews = document.querySelector("#image-previews");
+    const imagePreviewList = document.querySelector("#image-preview-list");
     let mediaUrl = null;
 
     document.title = `Test ${modality} · Broca`;
@@ -94,6 +100,8 @@
         button.disabled = true;
         status.textContent = "Running…";
         output.replaceChildren();
+        imagePreviews.hidden = true;
+        imagePreviewList.replaceChildren();
         if (mediaUrl !== null) {
             URL.revokeObjectURL(mediaUrl);
             mediaUrl = null;
@@ -153,8 +161,6 @@
                 throw new Error(typeof error.detail === "string" ? error.detail : error.detail?.[0]?.msg || "Check the test input.");
             }
             if (isImage) {
-                const image = document.createElement("img");
-                image.className = "max-w-full";
                 let pending = "";
                 let completed = false;
                 for await (const chunk of response.body.pipeThrough(new TextDecoderStream())) {
@@ -170,11 +176,26 @@
                         const preview = event.type === "image_generation.partial_image";
                         const final = event.type === "image_generation.completed";
                         if (!preview && !final) continue;
-                        image.alt = preview ? "Image preview" : "Generated image";
+                        const image = document.createElement("img");
+                        image.className = "max-w-full";
                         image.src = `data:image/png;base64,${event.b64_json}`;
-                        if (!image.isConnected) output.append(image);
-                        if (preview) status.textContent = "Generating image…";
-                        if (final) completed = true;
+                        if (preview) {
+                            const item = document.createElement("li");
+                            const figure = document.createElement("figure");
+                            const caption = document.createElement("figcaption");
+                            image.alt = "";
+                            figure.className = "space-y-2";
+                            caption.textContent = `Preview ${event.partial_image_index + 1}`;
+                            figure.append(image, caption);
+                            item.append(figure);
+                            imagePreviewList.append(item);
+                            imagePreviews.hidden = false;
+                            status.textContent = `${caption.textContent} available. Generating image…`;
+                        } else {
+                            image.alt = "Generated image";
+                            output.append(image);
+                            completed = true;
+                        }
                     }
                 }
                 if (!completed) throw new Error("The image stream ended before generation completed.");

@@ -74,7 +74,7 @@ class TextPipeline(LlamaPipeline[str | TextRequest, TextResult]):
 
         :param inputs: Conversation turns, plain prompts, or queued call arguments.
         :returns: One completion per input, in input order.
-        :raises ValueError: If a prompt is blank or cannot fit in the model context.
+        :raises ValueError: If a turn is empty or cannot fit in the model context.
         :raises RuntimeError: If the loaded backend cannot complete the batch.
         """
         if not inputs:
@@ -93,8 +93,8 @@ class TextPipeline(LlamaPipeline[str | TextRequest, TextResult]):
                 if isinstance(item, InferenceCall)
                 else prepare_request(item)
             )
-            if not request.prompt.strip():
-                raise ValueError("Text prompt must not be blank.")
+            if not request.prompt.strip() and not request.attachments:
+                raise ValueError("Provide text or media in the current user turn.")
             options = request.options or TextOptions()
             thinking = (
                 config.enable_thinking

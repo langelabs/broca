@@ -12,6 +12,12 @@ from pydantic import (
 )
 
 
+AudioFormat = Literal["mp3", "opus", "aac", "flac", "wav", "pcm"]
+AudioMediaType = Literal[
+    "audio/mpeg", "audio/ogg", "audio/aac", "audio/flac", "audio/wav", "audio/pcm"
+]
+
+
 class AudioVoice(BaseModel):
     """Select a built-in Bark voice preset."""
 
@@ -28,7 +34,7 @@ class AudioOptions(BaseModel):
     semantic_max_new_tokens: PositiveInt | None = None
     temperature: float | None = Field(default=None, ge=0)
     seed: NonNegativeInt | None = None
-    output_format: Literal["wav", "flac"] = "wav"
+    output_format: AudioFormat = "wav"
 
 
 class AudioResult(BaseModel):
@@ -42,7 +48,7 @@ class AudioResult(BaseModel):
     )
 
     data: bytes = Field(min_length=1)
-    media_type: Literal["audio/wav", "audio/flac"]
+    media_type: AudioMediaType
     sample_rate: PositiveInt
     channels: PositiveInt
     duration_seconds: PositiveFloat
