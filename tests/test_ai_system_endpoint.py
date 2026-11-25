@@ -1,12 +1,12 @@
 """Exercise the system route with and without available accelerators."""
 
-import sys
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
 
+from broca.endpoints.system import _endpoint
 from broca.server import app
 
 
@@ -23,7 +23,7 @@ def test_system_reports_total_and_used_vram_across_visible_cuda_devices(
         device_count=Mock(return_value=len(readings)),
         mem_get_info=Mock(side_effect=readings.__getitem__),
     )
-    monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(cuda=cuda))
+    monkeypatch.setattr(_endpoint, "torch", SimpleNamespace(cuda=cuda))
 
     with TestClient(app) as client:
         response = client.get("/system")
@@ -46,7 +46,7 @@ def test_system_reports_metal_budget_and_driver_allocations(
     )
     cuda = SimpleNamespace(is_available=Mock(return_value=False))
     torch = SimpleNamespace(cuda=cuda, mps=mps)
-    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setattr(_endpoint, "torch", torch)
 
     with TestClient(app) as client:
         response = client.get("/system")
@@ -55,18 +55,15 @@ def test_system_reports_metal_budget_and_driver_allocations(
     assert response.json() == {"max_vram_bytes": 4096, "used_vram_bytes": 1024}
 
 
-@pytest.mark.parametrize("torch_installed", [True, False])
 def test_system_reports_zero_without_a_supported_accelerator(
-    monkeypatch: pytest.MonkeyPatch, torch_installed: bool
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Serve zero VRAM on CPU-only installs and without the optional dependency.
+    """Serve zero VRAM on CPU-only installs.
 
-    :param monkeypatch: Replace the accelerator API or simulate a missing package.
-    :param torch_installed: Whether the optional PyTorch package is present.
+    :param monkeypatch: Replace the accelerator API with unavailable devices.
     """
     cpu = SimpleNamespace(is_available=Mock(return_value=False))
-    torch = SimpleNamespace(cuda=cpu, mps=cpu) if torch_installed else None
-    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setattr(_endpoint, "torch", SimpleNamespace(cuda=cpu, mps=cpu))
 
     with TestClient(app) as client:
         response = client.get("/system")

@@ -9,7 +9,16 @@ import torch
 from ...ai_model import AiModel
 from .._pipelines import BarkPipeline
 from ._model import _model
-from ._types import AudioOptions, AudioResult, AudioVoice
+from ._types import AudioFormat, AudioMediaType, AudioOptions, AudioResult, AudioVoice
+
+_ENCODINGS: dict[AudioFormat, tuple[str, str, AudioMediaType]] = {
+    "mp3": ("mp3", "libmp3lame", "audio/mpeg"),
+    "opus": ("opus", "libopus", "audio/ogg"),
+    "aac": ("adts", "aac", "audio/aac"),
+    "flac": ("flac", "flac", "audio/flac"),
+    "wav": ("wav", "pcm_s16le", "audio/wav"),
+    "pcm": ("s16le", "pcm_s16le", "audio/pcm"),
+}
 
 
 class AudioPipeline(BarkPipeline[str, AudioResult]):
@@ -84,14 +93,14 @@ class AudioPipeline(BarkPipeline[str, AudioResult]):
         frame = av.AudioFrame.from_ndarray(pcm, format="s16", layout="mono")
         frame.sample_rate = sample_rate
         output = BytesIO()
-        with av.open(output, "w", format=options.output_format) as container:
-            codec = "flac" if options.output_format == "flac" else "pcm_s16le"
+        container_format, codec, media_type = _ENCODINGS[options.output_format]
+        with av.open(output, "w", format=container_format) as container:
             stream = container.add_stream(codec, rate=sample_rate, layout="mono")
             container.mux(stream.encode(frame))
             container.mux(stream.encode())
         return AudioResult(
             data=output.getvalue(),
-            media_type="audio/flac" if options.output_format == "flac" else "audio/wav",
+            media_type=media_type,
             sample_rate=sample_rate,
             channels=1,
             duration_seconds=frame.samples / sample_rate,

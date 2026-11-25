@@ -1,14 +1,7 @@
 """Image inference package."""
-
-from functools import partial
-from typing import TYPE_CHECKING
-
-from .._exports import resolve_pipeline_export
 from ._model import _model
+from ._pipeline import ImagePipeline, pipeline
 
-if TYPE_CHECKING:
-    from ._pipeline import ImagePipeline, pipeline
+infer = pipeline.infer
 
-__all__ = ["ImagePipeline", "_model", "pipeline"]
-
-__getattr__ = partial(resolve_pipeline_export, __name__, __all__)
+__all__ = ["ImagePipeline", "_model", "pipeline","infer"]

@@ -29,9 +29,11 @@ def test_concurrent_requests_share_embedding_batches_and_keep_their_settings(
         "title: none | text: First document": [3.0, 4.0] + [0.0] * 766,
         "title: none | text: Second document": [5.0] + [0.0] * 767,
         "task: search result | query: Third input": [0.0, 9.0] + [0.0] * 766,
+        "title: none | text: Fourth input": [4.0] + [0.0] * 767,
     }
     runtime = Mock()
     runtime.embed.side_effect = lambda texts, **_: [prompts[text] for text in texts]
+    runtime.tokenize.return_value = [1, 2, 3, 4]
     monkeypatch.setattr(pipeline, "_runtime", runtime)
     image = ImageEmbeddingInput(data=b"image")
     audio = AudioEmbeddingInput(data=b"audio")
@@ -51,11 +53,14 @@ def test_concurrent_requests_share_embedding_batches_and_keep_their_settings(
                     task="search_query", dimensions=128, normalize=False
                 ),
             ),
+            pipeline.infer(["Fourth input"]),
         )
 
-    first, second = asyncio.run(collect())
+    first, second, third = asyncio.run(collect())
 
     runtime.embed.assert_called_once_with(list(prompts), truncate=False)
+    runtime.tokenize.assert_called_once_with(b"title: none | text: Fourth input")
+    assert third.prompt_tokens == 4
     embed_media.assert_called_once_with(runtime, [image, audio])
     assert first == EmbeddingResult(
         vectors=[

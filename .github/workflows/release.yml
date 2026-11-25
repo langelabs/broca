@@ -57,7 +57,7 @@ jobs:
           uv lock --check
           SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
           export SOURCE_DATE_EPOCH
-          uv build --python 3.12
+          uv build
           uvx --from twine==6.2.0 twine check --strict dist/*
 
       - name: Upload the wheel and source distribution
