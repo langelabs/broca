@@ -12,7 +12,8 @@ RUN apt-get update \
     && dpkg -i /tmp/cuda-keyring.deb \
     && apt-get update \
     && apt-get install --yes --no-install-recommends \
-        cuda-cudart-dev-13-2=13.2.86-1 cuda-nvcc-13-2=13.2.86-1 libcublas-dev-13-2=13.4.1.3-1 \
+        cuda-cudart-dev-13-2=13.2.86-1 cuda-nvcc-13-2=13.2.86-1 \
+        cuda-nvml-dev-13-2=13.2.86-1 libcublas-dev-13-2=13.4.1.3-1 \
     && rm -rf /var/lib/apt/lists/* /tmp/cuda-keyring.deb
 
 COPY --from=uv /uv /usr/local/bin/uv
