@@ -47,10 +47,10 @@ class VideoBackend(NoOpBackend, DeclarativeDocumentBackend):
         return {InputFormat.VIDEO}
 
     def convert(self) -> DoclingDocument:
-        """Sample one frame per second and transcribe the first audio track.
+        """Describe video frames and transcribe audio when either track is available.
 
         :returns: A document with timestamped descriptions and any transcript.
-        :raises ValueError: If the video has no decodable frames.
+        :raises ValueError: If there are no usable video or audio tracks.
         :raises RuntimeError: If the input has already been unloaded.
         """
         source = self.path_or_stream
@@ -63,40 +63,41 @@ class VideoBackend(NoOpBackend, DeclarativeDocumentBackend):
 
         with Runner() as runner:
             with av.open(source, mode="r", options=options) as video:
-                if not video.streams.video:
-                    raise ValueError("The file contains no video stream.")
                 has_audio = bool(video.streams.audio)
-                frame_rate = float(video.streams.video[0].average_rate or 1)
-                origin: float | None = None
-                last_second = -1
-                frames: list[tuple[float, ImageAttachment]] = []
-                for index, frame in enumerate(chain(video.decode(video=0), (None,))):
-                    if frame is not None:
-                        elapsed = index / frame_rate
-                        if frame.time is not None:
-                            if origin is None:
-                                origin = frame.time - elapsed
-                            elapsed = max(0.0, frame.time - origin)
-                        second = floor(elapsed)
-                        if second <= last_second:
-                            continue
-                        last_second = second
-                        image = frame.to_image()
-                        if frame.rotation:
-                            image = image.rotate(frame.rotation, expand=True)
-                        frames.append((elapsed, ImageBackend.create_attachment(image)))
+                if not video.streams.video and not has_audio:
+                    raise ValueError("The file contains no video or audio stream.")
+                if video.streams.video:
+                    frame_rate = float(video.streams.video[0].average_rate or 1)
+                    origin: float | None = None
+                    last_second = -1
+                    frames: list[tuple[float, ImageAttachment]] = []
+                    for index, frame in enumerate(chain(video.decode(video=0), (None,))):
+                        if frame is not None:
+                            elapsed = index / frame_rate
+                            if frame.time is not None:
+                                if origin is None:
+                                    origin = frame.time - elapsed
+                                elapsed = max(0.0, frame.time - origin)
+                            second = floor(elapsed)
+                            if second <= last_second:
+                                continue
+                            last_second = second
+                            image = frame.to_image()
+                            if frame.rotation:
+                                image = image.rotate(frame.rotation, expand=True)
+                            frames.append((elapsed, ImageBackend.create_attachment(image)))
 
-                    if frames and (frame is None or len(frames) == _FRAMES_PER_REQUEST):
-                        description = runner.run(self.interpret(frames))
-                        if description:
-                            document.add_text(
-                                label=DocItemLabel.PARAGRAPH,
-                                text=f"[{frames[0][0]:.1f}s] {description}",
-                            )
-                        frames.clear()
+                        if frames and (frame is None or len(frames) == _FRAMES_PER_REQUEST):
+                            description = runner.run(self.interpret(frames))
+                            if description:
+                                document.add_text(
+                                    label=DocItemLabel.PARAGRAPH,
+                                    text=f"[{frames[0][0]:.1f}s] {description}",
+                                )
+                            frames.clear()
 
-                if last_second < 0:
-                    raise ValueError("The video stream contains no decodable frames.")
+                    if last_second < 0:
+                        raise ValueError("The video stream contains no decodable frames.")
 
             if has_audio:
                 if isinstance(source, BytesIO):

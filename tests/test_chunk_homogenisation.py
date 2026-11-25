@@ -171,3 +171,31 @@ def test_homogenisation_preserves_text_only_conversion(
 
     assert markdown == "# Notes\n\nText only."
     model.assert_not_awaited()
+
+
+def test_homogenisation_transcribes_audio_only_webm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Transcribe an audio-only WebM recording from a browser.
+
+    :param monkeypatch: Substitute the text model at the inference boundary.
+    """
+    model = AsyncMock(
+        return_value=TextResult(text="Recorded speech.", finish_reason="stop")
+    )
+    monkeypatch.setattr(text, "infer", model)
+    source = BytesIO()
+    with av.open(source, mode="w", format="webm") as output:
+        audio = output.add_stream("libopus", rate=48000)
+        audio.layout = "mono"
+        samples = av.AudioFrame(format="s16", layout="mono", samples=960)
+        samples.sample_rate = 48000
+        samples.planes[0].update(bytes(1920))
+        output.mux(audio.encode(samples))
+        output.mux(audio.encode(None))
+
+    markdown = asyncio.run(homogenise(source, name="recording.webm"))
+
+    assert "Recorded speech." in markdown
+    model.assert_awaited_once()
+    assert isinstance(model.await_args.kwargs["attachments"][0], AudioAttachment)
