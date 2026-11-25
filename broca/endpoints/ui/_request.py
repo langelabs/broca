@@ -4,7 +4,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from ...inference.text._types import TextAttachment
+from ...inference.text.types import TextAttachment
 
 
 class ModelTestRequest(BaseModel):

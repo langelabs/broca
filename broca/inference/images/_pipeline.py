@@ -18,7 +18,7 @@ from ...ai_model import AiModel
 from .._pipelines import Flux3Pipeline
 from .._pipelines.flux3 import flux_step_callback
 from ._model import _model
-from ._types import ImageOptions, ImagePreviewCallback, ImageResult, RasterFormat
+from .types import ImageOptions, ImagePreviewCallback, ImageResult, RasterFormat
 
 
 def _encode_image(image: Image.Image, output_format: RasterFormat) -> bytes:

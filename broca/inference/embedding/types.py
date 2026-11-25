@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Annotated, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, NonNegativeInt
 
 
 class ImageEmbeddingInput(BaseModel):
@@ -77,10 +77,11 @@ class EmbeddingRequest:
 
 
 class EmbeddingResult(BaseModel):
-    """Return vectors in input order, with one vector per supplied input."""
+    """Return ordered vectors and token usage for text-only requests."""
 
     model_config = ConfigDict(extra="forbid")
 
     vectors: list[list[FiniteFloat]] = Field(min_length=1)
     dimensions: EmbeddingDimensions
     normalized: bool
+    prompt_tokens: NonNegativeInt | None = None

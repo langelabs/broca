@@ -7,7 +7,7 @@ from pydantic import JsonValue, TypeAdapter
 from ...ai_model import AiModel
 from .._pipelines import BekkoPipeline
 from ._model import _model
-from ._types import DecisionOptions, DecisionRequest, DecisionResult
+from .types import DecisionOptions, DecisionRequest, DecisionResult
 
 result_adapter: TypeAdapter[DecisionResult] = TypeAdapter(DecisionResult)
 

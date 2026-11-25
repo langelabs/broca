@@ -5,6 +5,9 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+from ...inference.audio._types import AudioFormat
+
+
 class VoiceReference(BaseModel):
     """Identify a custom voice by its API ID."""
 
@@ -18,6 +21,6 @@ class SpeechRequest(BaseModel):
     input: str = Field(min_length=1, max_length=4096)
     voice: str | VoiceReference
     instructions: str | None = Field(default=None, max_length=4096)
-    response_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"] = "mp3"
+    response_format: AudioFormat = "mp3"
     speed: float = Field(default=1.0, ge=0.25, le=4.0)
     stream_format: Literal["audio", "sse"] = "audio"

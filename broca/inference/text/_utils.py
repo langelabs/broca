@@ -9,7 +9,7 @@ from llama_cpp.llama_types import (
     CompletionUsage,
 )
 
-from ._types import (
+from .types import (
     ImageAttachment,
     TextAttachment,
     TextMessage,

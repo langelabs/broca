@@ -1,4 +1,4 @@
-"""Multipart request for the OpenAI-compatible video creation endpoint."""
+"""Multipart request for video generation."""
 
 from typing import Literal
 
@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 
 class VideoRequest(BaseModel):
-    """Describe a video generation job submitted as multipart form data."""
+    """Describe a video to generate from multipart form data."""
 
     prompt: str = Field(min_length=1, max_length=32000)
     model: str | None = None

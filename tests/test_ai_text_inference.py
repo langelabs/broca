@@ -8,7 +8,7 @@ from llama_cpp import llama_cpp as native
 from llama_cpp.llama_chat_format import Gemma4ChatHandler
 from pydantic import ValidationError
 
-from broca.inference.text import _types, _utils
+from broca.inference.text import types, _utils
 from broca.inference.text._pipeline import pipeline
 
 
@@ -18,10 +18,10 @@ def test_prepare_messages_preserves_conversation_order(with_media: bool) -> None
 
     :param with_media: Whether to submit an image and an MP3 attachment.
     """
-    attachments: list[_types.TextAttachment] = (
+    attachments: list[types.TextAttachment] = (
         [
-            _types.ImageAttachment(type="image", format="jpeg", data="AQID"),
-            _types.AudioAttachment(type="input_audio", format="mp3", data="BAUG"),
+            types.ImageAttachment(type="image", format="jpeg", data="AQID"),
+            types.AudioAttachment(type="input_audio", format="mp3", data="BAUG"),
         ]
         if with_media
         else []
@@ -30,8 +30,8 @@ def test_prepare_messages_preserves_conversation_order(with_media: bool) -> None
         "Current question",
         system_prompt="Instructions",
         history=[
-            _types.TextMessage(role="user", content="Previous question"),
-            _types.TextMessage(role="assistant", content="Previous answer"),
+            types.TextMessage(role="user", content="Previous question"),
+            types.TextMessage(role="assistant", content="Previous answer"),
         ],
         attachments=attachments,
     )
@@ -92,7 +92,7 @@ def test_build_text_result_separates_gemma_reasoning(
     assert result.text == expected_text
     assert result.reasoning == expected_reasoning
     assert result.finish_reason == finish_reason
-    assert result.usage == _types.TokenUsage(prompt_tokens=3, completion_tokens=2)
+    assert result.usage == types.TokenUsage(prompt_tokens=3, completion_tokens=2)
 
 
 def test_gemma_passes_images_and_audio_to_the_multimodal_handler(
@@ -118,10 +118,10 @@ def test_gemma_passes_images_and_audio_to_the_multimodal_handler(
         pipeline.infer(
             "Describe both files.",
             attachments=[
-                _types.ImageAttachment(type="image", format="png", data="AQID"),
-                _types.AudioAttachment(type="input_audio", format="wav", data="BAUG"),
+                types.ImageAttachment(type="image", format="png", data="AQID"),
+                types.AudioAttachment(type="input_audio", format="wav", data="BAUG"),
             ],
-            options=_types.TextOptions(
+            options=types.TextOptions(
                 enable_thinking=True, max_tokens=2, stop=["END"]
             ),
         )
@@ -129,7 +129,7 @@ def test_gemma_passes_images_and_audio_to_the_multimodal_handler(
 
     assert result.text == "Media answer"
     assert result.finish_reason == "length"
-    assert result.usage == _types.TokenUsage(prompt_tokens=120, completion_tokens=2)
+    assert result.usage == types.TokenUsage(prompt_tokens=120, completion_tokens=2)
     assert handler.call_args.kwargs["messages"][-1]["content"] == [
         {"type": "image_url", "image_url": {"url": "data:image/png;base64,AQID"}},
         {"type": "image_url", "image_url": {"url": "data:audio/wav;base64,BAUG"}},
@@ -145,13 +145,13 @@ def test_single_inference_uses_one_batch_item(monkeypatch: pytest.MonkeyPatch) -
 
     :param monkeypatch: Capture calls at the private batch boundary.
     """
-    expected = _types.TextResult(text="Answer", finish_reason="stop")
+    expected = types.TextResult(text="Answer", finish_reason="stop")
     batched = AsyncMock(return_value=[expected])
     monkeypatch.setattr(pipeline, "_infer_batched", batched)
 
     inference = asyncio.run(
         pipeline._infer(
-            "Question", system_prompt="Instructions", options=_types.TextOptions(seed=0)
+            "Question", system_prompt="Instructions", options=types.TextOptions(seed=0)
         )
     )
     assert inference == expected
@@ -236,15 +236,15 @@ def test_batch_decodes_distinct_sequences_together_and_keeps_order(
     monkeypatch.setattr(native, "llama_decode", decode)
     monkeypatch.setattr(native, "llama_sampler_sample", sample)
 
-    async def collect() -> list[_types.TextResult]:
+    async def collect() -> list[types.TextResult]:
         """Submit options, a keyword prompt, and a prepared request together.
 
         :returns: The caller's results in submission order.
         """
         return await asyncio.gather(
-            pipeline.infer("Long prompt", options=_types.TextOptions(temperature=0)),
+            pipeline.infer("Long prompt", options=types.TextOptions(temperature=0)),
             pipeline.infer(prompt="Short"),
-            pipeline.infer(_types.TextRequest("Next")),
+            pipeline.infer(types.TextRequest("Next")),
         )
 
     if decode_status < 0:
@@ -258,7 +258,7 @@ def test_batch_decodes_distinct_sequences_together_and_keeps_order(
 
     assert [result.text for result in results] == ["Long", "Short", "Next"]
     assert [result.usage for result in results] == [
-        _types.TokenUsage(prompt_tokens=count, completion_tokens=1)
+        types.TokenUsage(prompt_tokens=count, completion_tokens=1)
         for count in [3, 1, 1]
     ]
     assert any(len({seq for seq, *_ in batch}) == 2 for batch in batches)
@@ -273,4 +273,4 @@ def test_batch_decodes_distinct_sequences_together_and_keeps_order(
 def test_gemma_attachments_require_inline_base64_data() -> None:
     """Reject external URLs and malformed payloads before they reach the decoder."""
     with pytest.raises(ValidationError, match="base64"):
-        _types.ImageAttachment(type="image", format="png", data="https://example.com")
+        types.ImageAttachment(type="image", format="png", data="https://example.com")

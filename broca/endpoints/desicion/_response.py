@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, FiniteFloat, NonNegativeInt
 
-from ...inference.decision._types import Probability
+from broca.inference.decision.types import Probability
 from ._request import ChoiceValue
 
 
@@ -84,7 +84,7 @@ class DecisionUsage(BaseModel):
 
 
 class DecisionResponse(BaseModel):
-    """Return typed answers in question order and token usage."""
+    """Return typed answers in question order with usage when available."""
 
     model: str
     answers: list[
@@ -93,4 +93,4 @@ class DecisionResponse(BaseModel):
             Field(discriminator="type"),
         ]
     ]
-    usage: DecisionUsage
+    usage: DecisionUsage | None = None

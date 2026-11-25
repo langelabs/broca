@@ -19,7 +19,7 @@ Metal or MPS for Apple Silicon.
 
 ## Usage
 
-Use Python 3.11 or newer. From a checkout, run `uv sync --locked` to install
+Use Python 3.13 or 3.14. From a checkout, run `uv sync --locked` to install
 Broca with its inference backends.
 
 ### Define a custom AI model
@@ -101,9 +101,8 @@ app.include_router(broca_router)
 uv run --locked uvicorn app:app --host 127.0.0.1 --port 9001
 ```
 
-Open the dashboard at `http://localhost:9001/` to download, load, and test models
-from the built-in catalog. The router mounts the inference API under `/v1`
-and FastAPI serves interactive API docs at `http://localhost:9001/docs`.
+The router mounts the inference API under `/v1` and FastAPI serves interactive
+API docs at `http://localhost:9001/docs`.
 
 ### Run the published package or container
 
@@ -128,6 +127,13 @@ docker run --rm --gpus all --entrypoint python lange-labs/mesh:latest \
   -c 'import llama_cpp, torch; assert torch.cuda.is_available(); assert llama_cpp.llama_supports_gpu_offload()'
 ```
 
+## Dashboard
+
+Open the dashboard at `http://localhost:9001/` to download, load, and test models
+from the built-in catalog.
+
+![Broca inference dashboard](docs/images/dashboard.png)
+
 ## Development
 
 ```bash
@@ -141,29 +147,3 @@ The benchmarks use an OpenAI-compatible server on `http://127.0.0.1:8080/v1`.
 With a compatible server running, use
 `uv run --group benchmarks python tests/benchmarks/gemma_4_llama_cpp.py` or
 `uv run --group benchmarks python tests/benchmarks/gemma_4_mlx_vlm.py`.
-
-## Releases
-
-1. Open a PR with the new SemVer version. For a patch release, run
-   `uv version --bump patch` and `uv lock --check`, then commit `pyproject.toml`
-   and `uv.lock`. Use `--bump minor` or `--bump major` for the corresponding
-   changes.
-2. After the PR merges and CI passes, publish a stable GitHub Release with the
-   tag `vX.Y.Z` at the matching commit on `main`. Mark it Latest if it should
-   become the default Docker image. For a maintenance release, disable that
-   setting to keep the existing `latest` tag.
-3. Check the Release workflow, install `broca==X.Y.Z` from PyPI, and pull
-   `lange-labs/mesh:X.Y.Z` from Docker Hub. For the GitHub Latest release, verify
-   that the version tag and `latest` resolve to the same digest with
-   `docker buildx imagetools inspect`.
-
-The PyPI Trusted Publisher is `langelabs/broca` with workflow `release.yml`.
-The publishing job runs in the `pypi` GitHub Actions environment. In the
-`dockerhub` environment, set the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
-secrets to a Docker Hub credential with push access to `lange-labs/mesh`.
-
-If publishing fails, fix the reported problem and use **Re-run failed jobs**
-on the original workflow run. This preserves the validated Python artifacts
-and avoids reissuing the release tag. The workflow checks existing artifacts
-before reusing them and updates `latest` after the version is available in both
-registries.

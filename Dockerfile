@@ -1,10 +1,11 @@
-FROM ghcr.io/astral-sh/uv:0.11.14 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.9 AS uv
 
-FROM ubuntu:26.04 AS build
+# CUDA 13.2 and the PyTorch CUDA libraries use the Ubuntu 24.04 build toolchain.
+FROM ubuntu:24.04 AS build
 WORKDIR /build
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
-        build-essential ca-certificates cmake curl ninja-build python3.12-dev python3.12-venv \
+        build-essential ca-certificates cmake curl ninja-build \
     && curl --fail --silent --show-error --location \
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \
         --output /tmp/cuda-keyring.deb \
@@ -16,25 +17,28 @@ RUN apt-get update \
 
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_PROJECT_ENVIRONMENT=/opt/broca \
-    UV_PYTHON_DOWNLOADS=never \
+    UV_PYTHON_INSTALL_DIR=/opt/python \
+    UV_PYTHON_DOWNLOADS=manual \
     CUDACXX=/usr/local/cuda-13.2/bin/nvcc \
     CMAKE_BUILD_PARALLEL_LEVEL=2
 # Disabling CUDA VMM allows this backend to load on hosts without libcuda.so.
 ENV CMAKE_ARGS="-DGGML_CUDA=ON -DGGML_CUDA_NO_VMM=ON -DGGML_NATIVE=OFF -DCMAKE_CUDA_ARCHITECTURES=75-virtual;86-real;120-real"
-COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY .python-version pyproject.toml uv.lock README.md LICENSE ./
 COPY broca/ broca/
-RUN uv --no-cache sync --python /usr/bin/python3.12 --locked --no-default-groups --no-editable
+RUN uv python install --no-bin "$(cat .python-version)" \
+    && uv --no-cache sync --managed-python --locked --no-default-groups --no-editable
 
 FROM ubuntu:26.04 AS runtime
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates libgomp1 libstdc++6 python3.12 \
+    && apt-get install --yes --no-install-recommends ca-certificates libgomp1 libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 broca \
     && install -d -o broca -g broca /home/broca/ai
 
+COPY --from=build /opt/python /opt/python
 COPY --from=build /opt/broca /opt/broca
 # llama.cpp and PyTorch share the CUDA libraries installed from uv.lock.
-RUN printf '%s\n' /opt/broca/lib/python3.12/site-packages/nvidia/cu13/lib \
+RUN printf '%s\n' "$(/opt/broca/bin/python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')/nvidia/cu13/lib" \
         > /etc/ld.so.conf.d/broca-cuda.conf \
     && ldconfig
 

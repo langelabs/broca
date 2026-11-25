@@ -7,7 +7,17 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
 from ....ai_model import ModelModality
-from ....inference import get_model, is_model_loaded
+from ....inference import (
+    audio,
+    decision,
+    embedding,
+    get_model,
+    images,
+    is_model_loaded,
+    text,
+    video,
+)
+from ....inference.decision.types import DecisionRequest
 from .._request import ModelTestRequest
 from .._router import ui_router
 
@@ -16,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @ui_router.post("/{modality}")
 async def run_model_test(modality: ModelModality, body: ModelTestRequest) -> Response:
-    """Invoke the configured pipeline using a minimal test input.
+    """Invoke the modality's public inference function using a minimal test input.
 
     :param modality: Inference modality selected by the test page.
     :param body: Configured model ID, prompt or decision JSON, and optional text attachments.
@@ -41,44 +51,27 @@ async def run_model_test(modality: ModelModality, body: ModelTestRequest) -> Res
     try:
         match modality:
             case "audio":
-                from ....inference.audio._pipeline import pipeline as audio_pipeline
-
-                audio = await audio_pipeline.infer(body.input)
-                return Response(audio.data, media_type=audio.media_type)
+                speech = await audio.infer(body.input)
+                return Response(speech.data, media_type=speech.media_type)
             case "image":
-                from ....inference.images._pipeline import pipeline as image_pipeline
-
-                image = await image_pipeline.infer(body.input)
+                image = await images.infer(body.input)
                 return Response(image.data, media_type=image.media_type)
             case "video":
-                from ....inference.video._pipeline import pipeline as video_pipeline
-
-                video = await video_pipeline.infer(body.input)
-                return Response(video.data, media_type=video.media_type)
+                clip = await video.infer(body.input)
+                return Response(clip.data, media_type=clip.media_type)
             case "decision":
-                from ....inference.decision._pipeline import (
-                    pipeline as decision_pipeline,
-                )
-                from ....inference.decision._types import DecisionRequest
-
-                decision = await decision_pipeline.infer(
+                answer = await decision.infer(
                     DecisionRequest.model_validate_json(body.input)
                 )
-                return JSONResponse(decision.model_dump(mode="json"))
+                return JSONResponse(answer.model_dump(mode="json"))
             case "embedding":
-                from ....inference.embedding._pipeline import (
-                    pipeline as embedding_pipeline,
+                vectors = await embedding.infer([body.input])
+                return JSONResponse(
+                    vectors.model_dump(mode="json", exclude={"prompt_tokens"})
                 )
-
-                embedding = await embedding_pipeline.infer([body.input])
-                return JSONResponse(embedding.model_dump(mode="json"))
             case "text":
-                from ....inference.text._pipeline import pipeline as text_pipeline
-
-                text = await text_pipeline.infer(
-                    body.input, attachments=body.attachments
-                )
-                return JSONResponse(text.model_dump(mode="json"))
+                completion = await text.infer(body.input, attachments=body.attachments)
+                return JSONResponse(completion.model_dump(mode="json"))
     except ValidationError as error:
         message = error.errors(include_input=False)[0]["msg"]
         raise HTTPException(status_code=422, detail=message) from error

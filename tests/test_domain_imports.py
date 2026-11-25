@@ -42,6 +42,7 @@ def test_inference_module_exports_configurable_pipeline(
     shared_pipeline = module.pipeline
     assert isinstance(shared_pipeline, pipeline_class)
     assert shared_pipeline is get_pipeline(shared_pipeline.model)
+    assert module.infer == shared_pipeline.infer
     assert pipeline_class().model is shared_pipeline.model
 
     custom_model = AiModel(id="example/custom-model", device="cpu")

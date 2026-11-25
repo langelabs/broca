@@ -5,31 +5,17 @@ import logging
 from base64 import b64encode
 from collections.abc import AsyncGenerator
 from contextlib import aclosing, suppress
-from json import dumps
 from threading import Event
 from time import time
-from typing import TYPE_CHECKING
 
 from fastapi.responses import StreamingResponse
 from starlette.types import Send
 
-from ...inference.images._types import ImageOptions
-
-if TYPE_CHECKING:
-    from ...inference.images._pipeline import ImagePipeline
+from ...inference import images
+from ...inference.images.types import ImageOptions
+from .._events import event_frame
 
 logger = logging.getLogger(__name__)
-
-
-def _event(kind: str, payload: dict[str, object]) -> str:
-    """Encode a named SSE message with an OpenAI-style JSON payload.
-
-    :param kind: Name of the server-sent event.
-    :param payload: JSON fields to send in the data frame.
-    :returns: An SSE frame terminated by a blank line.
-    """
-    data = dumps(payload, separators=(",", ":"))
-    return f"event: {kind}\ndata: {data}\n\n"
 
 
 class ImageEventStream(StreamingResponse):
@@ -37,19 +23,17 @@ class ImageEventStream(StreamingResponse):
 
     def __init__(
         self,
-        pipeline: "ImagePipeline",
         prompt: str,
         options: ImageOptions,
         partial_images: int,
     ) -> None:
         """Bind one request to a lazily started event stream.
 
-        :param pipeline: Loaded image pipeline.
         :param prompt: Validated generation prompt.
         :param options: Image dimensions and encoding.
         :param partial_images: Maximum number of previews.
         """
-        self.events = self._events(pipeline, prompt, options, partial_images)
+        self.events = self._events(prompt, options, partial_images)
         super().__init__(
             self.events,
             media_type="text/event-stream",
@@ -66,14 +50,12 @@ class ImageEventStream(StreamingResponse):
 
     async def _events(
         self,
-        pipeline: "ImagePipeline",
         prompt: str,
         options: ImageOptions,
         partial_images: int,
     ) -> AsyncGenerator[str, None]:
         """Yield bounded preview frames followed by the final image or an error.
 
-        :param pipeline: Loaded image pipeline.
         :param prompt: Validated generation prompt.
         :param options: Image dimensions and encoding.
         :param partial_images: Maximum number of previews.
@@ -100,7 +82,7 @@ class ImageEventStream(StreamingResponse):
                     loop.call_soon_threadsafe(queue.put_nowait, (index, data))
 
         task = asyncio.create_task(
-            pipeline.infer(
+            images.infer(
                 prompt,
                 options=options,
                 partial_images=partial_images,
@@ -120,8 +102,7 @@ class ImageEventStream(StreamingResponse):
                     break
                 index, data = preview
                 kind = "image_generation.partial_image"
-                yield _event(
-                    kind,
+                yield event_frame(
                     {
                         **metadata,
                         "type": kind,
@@ -129,11 +110,11 @@ class ImageEventStream(StreamingResponse):
                         "partial_image_index": index,
                         "b64_json": b64encode(data).decode("ascii"),
                     },
+                    event=kind,
                 )
             image = await task
             kind = "image_generation.completed"
-            yield _event(
-                kind,
+            yield event_frame(
                 {
                     **metadata,
                     "type": kind,
@@ -141,17 +122,18 @@ class ImageEventStream(StreamingResponse):
                     "size": f"{image.width}x{image.height}",
                     "b64_json": b64encode(image.data).decode("ascii"),
                 },
+                event=kind,
             )
         except Exception as error:
             logger.error("Image stream failed (%s)", type(error).__name__)
-            yield _event(
-                "error",
+            yield event_frame(
                 {
                     "error": {
                         "type": "server_error",
                         "message": "Image generation failed.",
                     }
                 },
+                event="error",
             )
         finally:
             stopped.set()
