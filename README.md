@@ -19,7 +19,7 @@ Metal or MPS for Apple Silicon.
 
 ## Usage
 
-Use Python 3.13 or newer. From a checkout, run `uv sync --locked` to install
+Use Python 3.13 or 3.14. From a checkout, run `uv sync --locked` to install
 Broca with its inference backends.
 
 ### Define a custom AI model
